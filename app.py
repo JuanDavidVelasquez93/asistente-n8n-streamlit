@@ -27,7 +27,11 @@ if prompt := st.chat_input("Escribe tu pregunta..."):
 
     # Enviar a n8n
     try:
-        response = requests.post(N8N_WEBHOOK_URL, json={"chatInput": prompt})
+        headers = {
+            "Accept": "application/json, text/plain",
+            "Content-Type": "application/json"
+        }
+        response = requests.post(N8N_WEBHOOK_URL, json={"chatInput": prompt}, headers=headers)
 
         # Intentar parsear el JSON, incluso si viene como string anidado
         raw = response.text
@@ -39,21 +43,23 @@ if prompt := st.chat_input("Escribe tu pregunta..."):
             data = response.json()
 
         # Normalizar si viene dentro de "output"
-        if "output" in data:
+        if isinstance(data, dict) and "output" in data:
             data = data["output"]
 
-        # Mostrar respuesta básica
+        # Procesar respuesta en distintos formatos
         if isinstance(data, dict):
-            if "respuesta" in data:
+            if "respuesta" in data and isinstance(data["respuesta"], str):
                 result_md = f"✅ **{data['respuesta']}**"
-                # Agregar cualquier contenido adicional dinámicamente
+                # Mostrar otros campos como bloques JSON
                 for k, v in data.items():
                     if k != "respuesta":
                         result_md += f"\n\n🔹 **{k.capitalize()}**:\n```json\n{json.dumps(v, indent=2, ensure_ascii=False)}\n```"
             else:
-                result_md = f"📄 Respuesta:\n```json\n{json.dumps(data, indent=2, ensure_ascii=False)}\n```"
+                result_md = f"📄 Respuesta JSON:\n```json\n{json.dumps(data, indent=2, ensure_ascii=False)}\n```"
+        elif isinstance(data, str):
+            result_md = f"💬 {data}"
         else:
-            result_md = str(data)
+            result_md = f"📎 Respuesta sin formato:\n```{data}```"
 
     except Exception as e:
         result_md = f"❌ Error al contactar el agente: {e}"
