@@ -6,8 +6,8 @@ import json
 N8N_WEBHOOK_URL = "https://sistecredito.app.n8n.cloud/mcp/MCP"
 
 st.set_page_config(page_title="Asistente Empresarial")
-st.title("💬 Asistente Empresarial")
-st.markdown("Pregunta lo que quieras al agente conectado a la base de datos.")
+st.title("💬 Asistente Empresarial de información de clientes")
+st.markdown("Pregunta lo que quieras al agente csobre creditos.")
 
 # Inicializar historial
 if "messages" not in st.session_state:
@@ -29,32 +29,31 @@ if prompt := st.chat_input("Escribe tu pregunta..."):
     try:
         response = requests.post(N8N_WEBHOOK_URL, json={"chatInput": prompt})
 
-        # Intentar parsear el JSON, incluso si viene como string
+        # Intentar parsear el JSON, incluso si viene como string anidado
         raw = response.text
         try:
             data = json.loads(raw)
-            if isinstance(data, str):  # doble parsing si aún es string
+            if isinstance(data, str):
                 data = json.loads(data)
         except Exception:
             data = response.json()
 
-        # Extraer respuesta del agente
-        respuesta = data.get("respuesta")
-        empleados = data.get("empleados", [])
+        # Normalizar si viene dentro de "output"
+        if "output" in data:
+            data = data["output"]
 
-        # Construir respuesta para el chat
-        if respuesta:
-            result_md = f"✅ **{respuesta}**"
+        # Mostrar respuesta básica
+        if isinstance(data, dict):
+            if "respuesta" in data:
+                result_md = f"✅ **{data['respuesta']}**"
+                # Agregar cualquier contenido adicional dinámicamente
+                for k, v in data.items():
+                    if k != "respuesta":
+                        result_md += f"\n\n🔹 **{k.capitalize()}**:\n```json\n{json.dumps(v, indent=2, ensure_ascii=False)}\n```"
+            else:
+                result_md = f"📄 Respuesta:\n```json\n{json.dumps(data, indent=2, ensure_ascii=False)}\n```"
         else:
-            result_md = "❌ El agente no respondió correctamente."
-
-        # Mostrar detalles de empleados si existen
-        if empleados:
-            for emp in empleados:
-                nombre = emp.get("nombre", "Nombre no disponible")
-                valor = emp.get("valor_credito", "N/A")
-                fecha = emp.get("fecha", "Sin fecha")
-                result_md += f"\n\n🧑‍💼 **{nombre}**\n- 💰 Crédito: {valor}\n- 🗓 Fecha: {fecha}"
+            result_md = str(data)
 
     except Exception as e:
         result_md = f"❌ Error al contactar el agente: {e}"
